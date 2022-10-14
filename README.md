@@ -1,5 +1,7 @@
-# won
+# 이원욱의 포트폴리오 전용 repository입니다.
+
+#면접시 포트폴리오 공유용으로 사용하며, 발표자료만 업로드하니 참고 부탁드립니다. 감사합니다.
 
 
-Competition 및 de no vo design(신약 개발)관련 Generating 부분 github
+
 
