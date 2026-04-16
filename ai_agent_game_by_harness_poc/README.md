@@ -2,7 +2,9 @@
 
 > A side-scrolling runner game built entirely with **Claude Code Harness** — an AI agent framework that autonomously plans, implements, and reviews code step by step.
 
-![gameplay](KakaoTalk_20260416_123146915.gif)
+| Normal | Hurt |
+|:---:|:---:|
+| ![gorani-normal](media/gorani-character-front.gif) | ![gorani-hurt](media/gorani-character-side.gif) |
 
 ---
 
@@ -45,17 +47,17 @@ A *gorani* (Korean water deer), labeled a pest and facing euthanasia, wakes up f
 
 ## How It Was Built (Harness Workflow)
 
-```
-phases/
-└── 0-mvp/
-    ├── step0.md   → Project scaffold & Phaser setup
-    ├── step1.md   → Game loop, player movement, scrolling background
-    ├── step2.md   → Obstacles, items, HP system
-    ├── step3.md   → Day/Night system, helper characters
-    └── step4.md   → Audio system, game over scene, polish
-```
+The Harness workflow breaks a project into `phase → step` specs. Each step is a Markdown file describing *what* to build — the agent reads it, writes all the code, runs syntax checks, and moves to the next step autonomously.
 
-Each `.md` file is a spec given to the Harness agent. The agent reads it, writes all the code, runs syntax checks, and outputs results — no manual coding involved.
+| Phase | Steps | Deliverable |
+|---|---|---|
+| 0-mvp | step0 | Project scaffold, Phaser 3 setup |
+| 0-mvp | step1 | Game loop, player movement, scrolling background |
+| 0-mvp | step2 | Obstacles, items, HP system |
+| 0-mvp | step3 | Day/Night cycle, helper characters (sparrow/rat) |
+| 0-mvp | step4 | Audio system (Tone.js), game over scene, polish |
+
+No manual coding involved — developer writes the spec, Harness agent handles implementation.
 
 ---
 
