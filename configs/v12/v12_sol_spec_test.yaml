@@ -1,0 +1,37 @@
+# v1.2 v2 — SOL Speculative Leg B 테스트 (소액)
+# 기존 SOL config와 동일하되 use_speculative_leg_b: true + 소액 자본
+# 실행: python -m src.v12.live_v2 --live --config configs/v12/v12_sol_spec_test.yaml
+
+symbol: SOL
+binance_symbol_usdt: SOLUSDT
+binance_symbol_usdc: SOLUSDC
+
+# 소액 테스트: 기존 SOL의 절반
+initial_usdt: 50.0
+initial_usdc: 50.0
+
+dt_entry_threshold_rate: 0.0005
+dc_entry_threshold_rate: 0.0005
+
+entry_split_fraction: 0.33
+
+fee_rate: 0.0003
+fee_maker_rate: 0.00015
+use_maker_fees: true
+slippage_rate: 0.0
+
+leg_b_abort_threshold_rate: 0.0
+
+# Speculative Leg B ON
+use_speculative_leg_b: true
+
+ioc_price_buffer_rate: 0.0002
+
+emergency_taker_fee_rate: 0.0003
+emergency_slippage_rate: 0.0002
+
+rebalance_skew_threshold: 0.80
+rebalance_min_interval_sec: 3600
+
+order_timeout_sec: 30
+price_mode: close

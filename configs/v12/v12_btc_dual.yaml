@@ -1,0 +1,53 @@
+# Arb v1.2 — Binance BTCUSDT vs BTCUSDC (코드·설정은 configs/v12/ + src/v12/, v1.1 multi_main 과 분리)
+# 권장: python -m src.v12 --config configs/v12/v12_btc_dual.yaml --days 7 --resolution 1
+# 그리드: python -m src.v12.entry_grid --config configs/v12/v12_btc_dual.yaml --days 14 --wall-off
+# 결과 CSV: data/backtest/v12_entry_grid_*d_1m_*.csv
+
+symbol: BTC
+binance_symbol_usdt: BTCUSDT
+binance_symbol_usdc: BTCUSDC
+
+# 초기 시드 (USD 노셔널; BTC 레그는 첫 봉 가격으로 수량 환산)
+initial_usdt: 2500
+initial_usdc: 2500
+initial_btc_usdt_leg_usd: 2500
+initial_btc_usdc_leg_usd: 2500
+
+entry_threshold_rate: 0.0005
+# 역방향(USDC>USDT) 전용 임계값. 0.0 이면 entry_threshold_rate 와 동일하게 적용.
+# 역방향 프리미엄이 작을 때 낮게 설정해 거래 기회 확대 (예: 0.0002)
+reverse_entry_threshold_rate: 0.0
+entry_split_fraction: 0.25
+
+fee_usdt_leg_rate: 0.0004       # taker fee (시장가 주문)
+fee_usdc_leg_rate: 0.0004
+fee_usdt_leg_maker_rate: 0.0002  # maker fee (지정가 주문; Binance BTC VIP0)
+fee_usdc_leg_maker_rate: 0.0002
+use_maker_fees: false            # true 시 maker fee 기준으로 손익 계산·실행
+# 슬리피지: 기본 실행 시 configs/multi.yaml 의 v12_binance_dual_quote 가 우선, 없으면 coins[0] 레거시 매핑.
+#   끄기: python -m src.v12 --no-multi-slippage ...
+slippage_usdt_leg_rate: 0.0008
+slippage_usdc_leg_rate: 0.0008
+
+# 가상 레그 간 이동 (동일 거래소 가정)
+internal_transfer_btc_fee: 0.0
+internal_stable_move_fee_rate: 0.0
+
+max_daily_rebalances: 3
+rebalance_profit_multiplier: 2.0
+rebalance_imbalance_threshold: 0.15
+target_portfolio_ratio: 0.25
+emergency_cash_ratio: 0.08
+emergency_coin_ratio: 0.30
+
+wall_filter_enabled: false
+wall_min_liquidity_ratio: 0.6
+wall_buy_usdc_leg_taker_buy_ratio_max: 0.7
+wall_sell_usdc_leg_taker_buy_ratio_min: 0.3
+
+# 가격: close(종가) | hl_mid((high+low)/2, OHLC CSV 필요)
+price_mode: close
+
+# 민감도/연구용 예시:
+#   configs/v12/v12_btc_dual_aggressive.yaml
+#   configs/v12/v12_btc_dual_ohlc_hl_mid.yaml (분봉 레인지 중심가; 데이터 재수집)

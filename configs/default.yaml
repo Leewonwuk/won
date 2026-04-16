@@ -1,0 +1,28 @@
+symbol: BTC
+upbit_market: KRW-BTC
+binance_symbol: BTCUSDT
+fx_krw_per_usdt: 1500.0
+
+entry_threshold_rate: 0.003
+exit_threshold_rate: 0.0005
+loop_interval_sec: 1.5
+cooldown_sec: 10
+trade_size_base: 0.001
+
+fee_upbit_rate: 0.0005
+fee_binance_rate: 0.0004
+slippage_upbit_rate: 0.0007
+slippage_binance_rate: 0.0007
+transfer_fee_upbit_to_binance_base: 0.0
+transfer_fee_binance_to_upbit_base: 0.0
+
+mode: paper
+enable_live_orders: false
+live_dry_run: true
+order_timeout_sec: 3.0
+
+risk:
+  max_notional_krw: 1000000
+  max_daily_loss_krw: 100000
+  max_open_positions: 1
+

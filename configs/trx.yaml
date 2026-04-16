@@ -1,0 +1,30 @@
+symbol: TRX
+upbit_market: KRW-TRX
+binance_symbol: TRXUSDT
+fx_krw_per_usdt: 1500.0
+
+entry_threshold_rate: 0.0025
+exit_threshold_rate: 0.0006
+loop_interval_sec: 1.0
+cooldown_sec: 5
+trade_size_base: 3000.0
+
+fee_upbit_rate: 0.0005
+fee_binance_rate: 0.0004
+slippage_upbit_rate: 0.0009
+slippage_binance_rate: 0.0009
+
+# Example: fixed chain withdrawal fee in base units(TRX).
+transfer_fee_upbit_to_binance_base: 1.0
+transfer_fee_binance_to_upbit_base: 1.0
+
+mode: paper
+enable_live_orders: false
+live_dry_run: true
+order_timeout_sec: 3.0
+
+risk:
+  max_notional_krw: 5000000
+  max_daily_loss_krw: 200000
+  max_open_positions: 1
+

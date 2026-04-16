@@ -1,0 +1,41 @@
+symbol: BNB
+binance_symbol_usdt: BNBUSDT
+binance_symbol_usdc: BNBUSDC
+
+initial_usdt: 1199.0
+initial_usdc: 1199.0
+
+dt_entry_threshold_rate: 0.0017
+dc_entry_threshold_rate: 0.0017
+
+entry_split_fraction: 0.25
+
+fee_rate: 0.00075            # BNB 25% 할인 taker (0.1% × 0.75)
+fee_maker_rate: 0.00075      # BNB 25% 할인 maker (0.1% × 0.75)
+use_maker_fees: true
+
+slippage_rate: 0.0
+
+# BNB/USDC 유동성이 BNB/USDT보다 낮으므로 IOC 버퍼를 3bp로 설정
+ioc_price_buffer_rate: 0.0003
+# BNBUSDC 유동성 낮음 → miss 후 30초 쿨다운 (다른 코인은 5초)
+ioc_miss_cooldown_sec: 30.0
+
+use_speculative_leg_b: false
+leg_b_abort_threshold_rate: -0.99
+# BNB 변동성 중간, BNBUSDC Leg B 대기 길어질 수 있으므로 0.4%
+leg_b_stop_loss_rate: 0.004
+leg_b_reprice_on_drop: true
+
+emergency_taker_fee_rate: 0.00075
+emergency_slippage_rate: 0.0002
+
+rebalance_skew_threshold: 0.80
+rebalance_min_interval_sec: 0
+
+# 수수료 BNB 최소 보유량 — 0.5 미만이면 BNB 거래 진입 차단
+# (수수료 소비 + 거래 1회 notional 충분히 커버)
+min_bnb_fee_reserve: 0.5
+
+order_timeout_sec: 60
+price_mode: close

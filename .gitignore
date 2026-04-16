@@ -1,0 +1,56 @@
+node_modules/
+
+# QMD index (local DB; keep .qmd/.gitkeep in git)
+.qmd/*.sqlite
+.qmd/*.sqlite-shm
+.qmd/*.sqlite-wal
+
+# ===== 민감 정보 =====
+# API 키, 시크릿, 환경변수
+.env
+.env.local
+.env.*.local
+*.env
+*.env.*
+
+# SSH 개인키 / 인증서
+*.pem
+*.ppk
+*.key
+id_rsa
+id_ed25519
+arb_key.pem
+
+# ===== 런타임 / 로컬 전용 =====
+# 로그
+logs/
+
+# 백테스트 결과 CSV (용량 큼)
+data/backtest/
+data/v11_longterm/
+
+# Python 캐시
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# ===== 내부 운영 문서 (IP·잔고 노출) =====
+.cursor/
+.claude/
+
+# data 전체 (백테스트 결과, 용량 큼)
+data/
+
+# 번들 / 기타
+skillbook-share.zip
+harness-project/
+
+# 로컬 백업 env
+*.env_local.env

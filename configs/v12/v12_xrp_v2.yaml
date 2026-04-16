@@ -1,0 +1,54 @@
+# v1.2 v2 — XRP USDT/USDC 스테이블 전용 (통합 풀 모드)
+# 실행: python -m src.v12.live_v2 --live --global-lock \
+#         --configs configs/v12/v12_trx_v2.yaml,configs/v12/v12_doge_v2.yaml,configs/v12/v12_xrp_v2.yaml
+#
+# XRP 특성:
+#   - Binance XRPUSDT / XRPUSDC 유동성 풍부
+#   - 틱 $0.0001 (≈0.005%/틱), IOC 체결률 높음
+#   - USDT/USDC 스프레드 신호 신뢰도 높음
+
+symbol: XRP
+binance_symbol_usdt: XRPUSDT
+binance_symbol_usdc: XRPUSDC
+
+# 통합 풀 자본 (TRX 322+322 + DOGE 322+322 = 644+644)
+# GlobalLock 활성 시 1개 코인만 거래 → 전체 풀 사용 가능
+initial_usdt: 1199.0
+initial_usdc: 1199.0
+
+# 진입 임계값
+# fee_stack = taker 0.075% + maker 0.075% = 0.150%
+# IOC 실제 오버페이 ≈ 1~2틱 = 0.005~0.010% (버퍼 최악 0.020%)
+# 실질 손익분기 ≈ 0.155~0.160% → 0.175%는 평균 0.015~0.020% 마진
+dt_entry_threshold_rate: 0.0017
+dc_entry_threshold_rate: 0.0017
+
+entry_split_fraction: 0.25   # (644+644) × 0.25 = 322 USDT/trade
+
+# 수수료 — BNB 25% 할인 기준
+fee_rate: 0.00075            # BNB 25% 할인 taker (0.1% × 0.75)
+fee_maker_rate: 0.00075      # BNB 25% 할인 maker (0.1% × 0.75)
+use_maker_fees: true
+
+slippage_rate: 0.0
+
+# IOC Leg A 버퍼: XRP tick=$0.0001 (≈0.005%/틱), 0.0002 ≈ 2틱 여유
+ioc_price_buffer_rate: 0.0002
+
+# Leg B
+use_speculative_leg_b: false
+leg_b_abort_threshold_rate: -0.99
+leg_b_stop_loss_rate: 0.003
+leg_b_reprice_on_drop: true
+
+# 비상 청산
+emergency_taker_fee_rate: 0.00075
+emergency_slippage_rate: 0.0002
+
+# 잔고 리밸런싱
+rebalance_skew_threshold: 0.80
+rebalance_min_interval_sec: 0
+
+# 주문 타임아웃 (GlobalLock expire_sec = 이 값 + 30s = 150s)
+order_timeout_sec: 60
+price_mode: close

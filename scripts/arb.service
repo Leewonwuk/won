@@ -1,0 +1,19 @@
+[Unit]
+Description=Upbit-Binance arb (start.sh: v1.1 multi_main or v1.2 live_v2 via ARB_SERVICE_LINE)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/arb
+EnvironmentFile=-/home/ubuntu/arb/.env
+ExecStart=/home/ubuntu/arb/scripts/start.sh
+Restart=always
+RestartSec=5
+StandardOutput=append:/home/ubuntu/arb/logs/system.log
+StandardError=append:/home/ubuntu/arb/logs/system_error.log
+
+[Install]
+WantedBy=multi-user.target

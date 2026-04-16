@@ -1,0 +1,110 @@
+# arb v1.1 — 클라우드 실주문: scripts/cloud.env.v1.1.example (ARB_LIVE_DRY_RUN=false).
+# 실거래 전: live_dry_run false 는 실주문. 반드시 최종 확인.
+#
+# --- 구분 ---
+# · coins[] / 아래 TRX 블록 = 업비트↔바이낸스 v1.1 멀티 (slippage_upbit_rate ≠ 바이낸스 USDC 레그 의미).
+# · v12_binance_dual_quote = v1.2 전용: 바이낸스 BTCUSDT vs BTCUSDC 듀얼쿼트 슬리피지만 (TRX와 무관).
+#   v12 백테스트는 이 블록을 우선 읽고, 없을 때만 coins[0] 슬리피지 레거시 매핑.
+#
+# 손익분기 참고 (코인별 slippage_upbit 상이):
+#   TRX : fee 0.125% + slip_upbit 0.32% + slip_binance 0.02% = 0.465%  → threshold 0.00235
+#   DOGE: fee 0.125% + slip_upbit 0.40% + slip_binance 0.02% = 0.545%  → threshold 0.00275
+#   XRP : fee 0.125% + slip_upbit 0.03% + slip_binance 0.02% = 0.175%  → threshold 0.00090
+# (slippage_upbit = bid-ask spread/2 기반 실측. DOGE 138원 1원틱 0.72%, XRP 2024원 1원틱 0.05%)
+#
+# 시드(아비트 전용): TRX만 — 코인당 4슬롯 × 20만 = 80만 원 기준.
+# 업비트 KRW 한 통장이 더 크면: 라이브에서도 TRX 슬롯 initial_* 상한만 사용.
+#   - ARB_LIVE_SEED_FROM_CONFIG=true 권장 (YAML 시드만), 또는
+#   - 거래소 시딩 시 자동으로 initial_* 상한 (exchange_api_capped_yaml).
+mode: live
+enable_live_orders: true
+live_dry_run: true
+loop_interval_sec: 0.5
+order_timeout_sec: 3.0
+max_daily_loss_krw: 160000
+fx_krw_per_usdt: 1500.0
+
+# v1.2 Binance dual-quote (BTCUSDT / BTCUSDC) — 슬리피지만. TRX coins[].slippage_* 와 별도.
+v12_binance_dual_quote:
+  slippage_usdt_leg_rate: 0.0002   # 0.02% — 실측 기반 (사실상 0, 소폭 마진 포함)
+  slippage_usdc_leg_rate: 0.0002   # 0.02% — 동일 가정 (바이낸스 양 레그)
+
+coins:
+- symbol: TRX
+  upbit_market: KRW-TRX
+  binance_symbol: TRXUSDT
+  # TRX 코인당 80만(4×20만).
+  initial_upbit_krw: 200000
+  initial_upbit_coin_krw: 200000
+  initial_binance_usdt_krw: 200000
+  initial_binance_coin_krw: 200000
+  entry_threshold_rate: 0.00235   # 새 손익분기 0.00465 (fee 0.125%+slip 0.34%) 의 절반
+  cooldown_sec: 5
+  fee_upbit_rate: 0.0005
+  fee_binance_rate: 0.00075      # BNB 25% 할인 taker (0.1% × 0.75) — 이전 0.0004는 VIP4 오적용
+  slippage_upbit_rate: 0.0032
+  slippage_binance_rate: 0.0002  # 0.02% — 실측 기반 (사실상 0, 소폭 마진 포함)
+  transfer_fee_upbit_to_binance_base: 1.0   # 업비트 TRX 출금 수수료 (TRC20)
+  transfer_fee_binance_to_upbit_base: 1.5   # 바이낸스 TRX 출금 수수료 (TRC20) — 실측 1.5
+  fx_conversion_fee_rate: 0.001
+  max_daily_rebalances: 3
+  rebalance_profit_multiplier: 1.2
+  rebalance_imbalance_threshold: 0.15
+  wall_filter_enabled: true
+  wall_min_liquidity_ratio: 0.4
+  wall_buy_binance_taker_buy_ratio_max: 0.8
+  wall_sell_binance_taker_buy_ratio_min: 0.2
+
+- symbol: DOGE
+  upbit_market: KRW-DOGE
+  binance_symbol: DOGEUSDT
+  # DOGE 코인당 4슬롯 × 20만 = 80만 원 기준
+  initial_upbit_krw: 200000
+  initial_upbit_coin_krw: 200000
+  initial_binance_usdt_krw: 200000
+  initial_binance_coin_krw: 200000
+  # 손익분기 0.545% → threshold 절반 0.273% → 안전마진 포함 0.60%
+  entry_threshold_rate: 0.0060
+  cooldown_sec: 5
+  fee_upbit_rate: 0.0005
+  fee_binance_rate: 0.00075      # BNB 25% 할인 taker (0.1% × 0.75)
+  # DOGE: 138원대, 1원 틱 = 0.72% bid-ask → 시장가 슬리피지 ~0.36~0.40%
+  slippage_upbit_rate: 0.0040
+  slippage_binance_rate: 0.0002  # 바이낸스 DOGE 유동성 충분
+  transfer_fee_upbit_to_binance_base: 5.0   # 업비트 DOGE 출금 수수료
+  transfer_fee_binance_to_upbit_base: 4.0   # 바이낸스 DOGE 출금 수수료 (실측)
+  fx_conversion_fee_rate: 0.001
+  max_daily_rebalances: 3
+  rebalance_profit_multiplier: 1.2
+  rebalance_imbalance_threshold: 0.15
+  wall_filter_enabled: true
+  wall_min_liquidity_ratio: 0.4
+  wall_buy_binance_taker_buy_ratio_max: 0.8
+  wall_sell_binance_taker_buy_ratio_min: 0.2
+
+- symbol: XRP
+  upbit_market: KRW-XRP
+  binance_symbol: XRPUSDT
+  # XRP 코인당 4슬롯 × 20만 = 80만 원 기준
+  initial_upbit_krw: 200000
+  initial_upbit_coin_krw: 200000
+  initial_binance_usdt_krw: 200000
+  initial_binance_coin_krw: 200000
+  # 손익분기 0.175% → threshold 절반 0.088% → 안전마진 포함 0.20%
+  entry_threshold_rate: 0.0020
+  cooldown_sec: 5
+  fee_upbit_rate: 0.0005
+  fee_binance_rate: 0.00075      # BNB 25% 할인 taker (0.1% × 0.75)
+  # XRP: 2024원대, 1원 틱 = 0.05% bid-ask → 시장가 슬리피지 ~0.025%
+  slippage_upbit_rate: 0.0003
+  slippage_binance_rate: 0.0002  # 바이낸스 XRP 유동성 충분
+  transfer_fee_upbit_to_binance_base: 0.25  # 업비트 XRP 출금 수수료
+  transfer_fee_binance_to_upbit_base: 0.20  # 바이낸스 XRP 출금 수수료 (실측)
+  fx_conversion_fee_rate: 0.001
+  max_daily_rebalances: 3
+  rebalance_profit_multiplier: 1.2
+  rebalance_imbalance_threshold: 0.15
+  wall_filter_enabled: true
+  wall_min_liquidity_ratio: 0.4
+  wall_buy_binance_taker_buy_ratio_max: 0.8
+  wall_sell_binance_taker_buy_ratio_min: 0.2

@@ -1,0 +1,36 @@
+# v1.2 민감도 시나리오: 낮은 수수료/슬리피지 (VIP·메이커 가정 등 연구용, 실거래 전 검증 필수)
+# 그리드: python -m src.v12.entry_grid --config configs/v12/v12_btc_dual_aggressive.yaml --days 30 --wall-off
+
+symbol: BTC
+binance_symbol_usdt: BTCUSDT
+binance_symbol_usdc: BTCUSDC
+
+initial_usdt: 2500
+initial_usdc: 2500
+initial_btc_usdt_leg_usd: 2500
+initial_btc_usdc_leg_usd: 2500
+
+entry_threshold_rate: 0.0003
+entry_split_fraction: 1.0
+
+fee_usdt_leg_rate: 0.0002
+fee_usdc_leg_rate: 0.0002
+slippage_usdt_leg_rate: 0.0002
+slippage_usdc_leg_rate: 0.0002
+
+internal_transfer_btc_fee: 0.0
+internal_stable_move_fee_rate: 0.0
+
+max_daily_rebalances: 3
+rebalance_profit_multiplier: 2.0
+rebalance_imbalance_threshold: 0.15
+target_portfolio_ratio: 0.25
+emergency_cash_ratio: 0.08
+emergency_coin_ratio: 0.30
+
+wall_filter_enabled: false
+wall_min_liquidity_ratio: 0.6
+wall_buy_usdc_leg_taker_buy_ratio_max: 0.7
+wall_sell_usdc_leg_taker_buy_ratio_min: 0.3
+
+price_mode: close

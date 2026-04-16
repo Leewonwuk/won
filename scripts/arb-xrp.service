@@ -1,0 +1,24 @@
+[Unit]
+Description=Arb v1.2 ??XRP USDT/USDC spread (live_v2)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/arb
+EnvironmentFile=-/home/ubuntu/arb/.env
+Environment=ARB_SERVICE_LINE=v1.2
+Environment=ARB_V12_LIVE=1
+Environment=ARB_V12_CONFIG=configs/v12/v12_xrp_v2.yaml
+Environment=ARB_V12_TIMEOUT=15
+Environment=ARB_V12_POLL=0.5
+ExecStart=/home/ubuntu/arb/venv/bin/python -m src.v12.live_v2 --config configs/v12/v12_xrp_v2.yaml --poll 0.5 --timeout 15 --live
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/ubuntu/arb/logs/xrp.log
+StandardError=append:/home/ubuntu/arb/logs/xrp_error.log
+
+[Install]
+WantedBy=multi-user.target

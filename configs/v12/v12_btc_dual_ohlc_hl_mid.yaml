@@ -1,0 +1,36 @@
+# v1.2: (high+low)/2 를 레그 mid 로 사용 — OHLC가 포함된 CSV 필요 (최신 collect_v12_btc_dual 로 재수집)
+# python -m src.v12 --config configs/v12/v12_btc_dual_ohlc_hl_mid.yaml --days 14 --resolution 1
+
+symbol: BTC
+binance_symbol_usdt: BTCUSDT
+binance_symbol_usdc: BTCUSDC
+
+initial_usdt: 2500
+initial_usdc: 2500
+initial_btc_usdt_leg_usd: 2500
+initial_btc_usdc_leg_usd: 2500
+
+entry_threshold_rate: 0.0005
+entry_split_fraction: 1.0
+
+fee_usdt_leg_rate: 0.0004
+fee_usdc_leg_rate: 0.0004
+slippage_usdt_leg_rate: 0.0008
+slippage_usdc_leg_rate: 0.0008
+
+internal_transfer_btc_fee: 0.0
+internal_stable_move_fee_rate: 0.0
+
+max_daily_rebalances: 3
+rebalance_profit_multiplier: 2.0
+rebalance_imbalance_threshold: 0.15
+target_portfolio_ratio: 0.25
+emergency_cash_ratio: 0.08
+emergency_coin_ratio: 0.30
+
+wall_filter_enabled: false
+wall_min_liquidity_ratio: 0.6
+wall_buy_usdc_leg_taker_buy_ratio_max: 0.7
+wall_sell_usdc_leg_taker_buy_ratio_min: 0.3
+
+price_mode: hl_mid

@@ -1,0 +1,38 @@
+# Claude Code: reduce context from generated, secret, and bulky paths.
+# Keep src/, configs/, tests/ readable. Mirrors .gitignore priorities where overlap makes sense.
+
+# Secrets and env
+.env
+.env.local
+.env.*.local
+*.pem
+*.ppk
+id_rsa
+id_ed25519
+secrets/
+
+# Python environments and caches
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Runtime logs (often large)
+logs/
+
+# Backtest artifacts (CSV/JSON reports can be huge)
+data/backtest/
+
+# Bundled / misc binary-ish
+skillbook-share.zip
+
+# Optional JS stacks (if added later)
+node_modules/
+
+# QMD SQLite index (large; MCP uses it via tools, not file reads)
+.qmd/
+.next/
+dist/
+build/

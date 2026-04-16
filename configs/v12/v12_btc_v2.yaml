@@ -1,0 +1,44 @@
+# v1.2 v2 — USDT/USDC 스테이블 전용 (BTC 보유 없음)
+# 실행: python -m src.v12.live_v2 --live --config configs/v12/v12_btc_v2.yaml
+#
+# 거래 구조:
+#   DT 프리미엄 (BTCUSDT > BTCUSDC): USDC → BTC → USDT  (스프레드 수취)
+#   DC 프리미엄 (BTCUSDC > BTCUSDT): USDT → BTC → USDC  (스프레드 수취)
+#   BTC는 경유 수단, 잔고 변화 없음
+
+symbol: BTC
+binance_symbol_usdt: BTCUSDT
+binance_symbol_usdc: BTCUSDC
+
+# 초기 자본 (스테이블코인만)
+initial_usdt: 550.0
+initial_usdc: 550.0
+
+# 진입 임계값
+# fee_stack = 2 × (fee_maker_rate + slippage_rate)
+#   BNB 할인 지정가: 2×(0.00015+0.0) = 0.0003 (0.03%)
+# 실측 스프레드: 0.050~0.095% → fee_stack 0.03% 초과 구간에서 거래 발생
+dt_entry_threshold_rate: 0.0004
+dc_entry_threshold_rate: 0.0004
+
+entry_split_fraction: 0.25   # 매 시그널 당 총 스테이블의 25% 사용
+
+# 수수료 (레그 당) — BNB 25% 할인 기준
+fee_rate: 0.0003             # taker fee + BNB 할인 (시장가; 비상청산 fallback)
+fee_maker_rate: 0.00015      # maker fee + BNB 할인 (지정가; 운영 기준)
+use_maker_fees: true         # 지정가 기준
+slippage_rate: 0.0           # BTC 극유동 → 슬리피지 ≈ 0
+
+# 비상 청산 (Leg B 타임아웃 시 시장가 청산)
+emergency_taker_fee_rate: 0.0003   # taker + BNB 할인
+emergency_slippage_rate: 0.0002    # 비상 시장가 슬리피지
+
+# 잔고 리밸런싱 (USDT↔USDC Convert)
+# 한쪽이 전체의 80% 이상 차지할 경우 50:50으로 Convert
+# API 키에 'Convert & Savings' 권한 필요
+rebalance_skew_threshold: 0.80    # 80% 초과 시 리밸런싱
+rebalance_min_interval_sec: 3600  # 최소 1시간 간격
+
+# 백테스트 전용
+order_timeout_sec: 30        # 지정가 타임아웃 (1분봉 기준 1봉)
+price_mode: close

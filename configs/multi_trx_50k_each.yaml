@@ -1,0 +1,32 @@
+# 페이퍼 검증용: 업비트 현금·업비트 TRX·바이낸스 USDT·바이낸스 TRX 각 약 5만원(KRW 환산) 규모
+mode: paper
+enable_live_orders: false
+live_dry_run: true
+loop_interval_sec: 0.5
+order_timeout_sec: 3.0
+max_daily_loss_krw: 500000
+fx_krw_per_usdt: 1500.0
+coins:
+  - symbol: TRX
+    upbit_market: KRW-TRX
+    binance_symbol: TRXUSDT
+    initial_upbit_krw: 50000
+    initial_upbit_coin_krw: 50000
+    initial_binance_usdt_krw: 50000
+    initial_binance_coin_krw: 50000
+    entry_threshold_rate: 0.0043
+    cooldown_sec: 5
+    fee_upbit_rate: 0.0005
+    fee_binance_rate: 0.0004
+    slippage_upbit_rate: 0.0008
+    slippage_binance_rate: 0.0008
+    transfer_fee_upbit_to_binance_base: 1.0
+    transfer_fee_binance_to_upbit_base: 1.0
+    fx_conversion_fee_rate: 0.001
+    max_daily_rebalances: 3
+    rebalance_profit_multiplier: 1.2
+    rebalance_imbalance_threshold: 0.15
+    wall_filter_enabled: true
+    wall_min_liquidity_ratio: 0.4
+    wall_buy_binance_taker_buy_ratio_max: 0.8
+    wall_sell_binance_taker_buy_ratio_min: 0.2

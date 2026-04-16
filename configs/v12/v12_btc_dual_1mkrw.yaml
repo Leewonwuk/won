@@ -1,0 +1,37 @@
+# v1.2 — 총 100만 원(바이낸스 USDT 등가) 균등 4슬롯 시작.
+# multi.yaml fx_krw_per_usdt=1500 가정: 슬롯당 25만 원 → 250000/1500 USD
+# (USDT 현금 / USDC 현금 / BTC@USDT 레그 / BTC@USDC 레그 각 동일 노셔널)
+
+symbol: BTC
+binance_symbol_usdt: BTCUSDT
+binance_symbol_usdc: BTCUSDC
+
+initial_usdt: 166.66666666666666
+initial_usdc: 166.66666666666666
+initial_btc_usdt_leg_usd: 166.66666666666666
+initial_btc_usdc_leg_usd: 166.66666666666666
+
+entry_threshold_rate: 0.0005
+entry_split_fraction: 0.25
+
+fee_usdt_leg_rate: 0.0004
+fee_usdc_leg_rate: 0.0004
+slippage_usdt_leg_rate: 0.0008
+slippage_usdc_leg_rate: 0.0008
+
+internal_transfer_btc_fee: 0.0
+internal_stable_move_fee_rate: 0.0
+
+max_daily_rebalances: 10
+rebalance_profit_multiplier: 2.0
+rebalance_imbalance_threshold: 0.15
+target_portfolio_ratio: 0.25
+emergency_cash_ratio: 0.08
+emergency_coin_ratio: 0.30
+
+wall_filter_enabled: false
+wall_min_liquidity_ratio: 0.6
+wall_buy_usdc_leg_taker_buy_ratio_max: 0.7
+wall_sell_usdc_leg_taker_buy_ratio_min: 0.3
+
+price_mode: close

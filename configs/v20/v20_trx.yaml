@@ -1,0 +1,33 @@
+symbol: TRX
+spot_symbol: TRXUSDT
+futures_symbol: TRXUSDT
+
+# 자본 설정
+capital_usdt: 500.0        # 이 코인에 배분할 자본 (현물+선물 증거금 합산)
+position_fraction: 0.8     # 실제 사용 비율 (80%)
+leverage: 2                # ISOLATED 2x
+
+# 진입 조건
+entry_funding_rate: 0.0003   # 0.03%/8h (연 ~32.85%)
+max_basis_rate: 0.001        # 0.1% 이내 basis만 허용
+
+# 청산 조건
+exit_funding_rate: 0.00005   # 0.005%/8h 미만이면 청산
+stop_loss_usdt: -30.0        # net PnL -$30 시 비상 청산
+danger_margin_ratio: 0.20    # 증거금 비율 20% 미만 경고
+max_hold_hours: 168.0        # 최대 7일 보유
+
+# 쿨다운
+reentry_cooldown_sec: 300.0
+emergency_cooldown_sec: 3600.0
+
+# 수수료
+spot_fee_rate: 0.00075       # 현물 시장가 (BNB 할인)
+futures_fee_rate: 0.0002     # 선물 시장가
+
+# 운영
+dry_run: true                # 라이브 전환 시 false로 변경
+poll_interval_sec: 60.0
+pre_funding_check_sec: 300.0
+telegram_summary_sec: 1800.0
+log_dir: logs/v20

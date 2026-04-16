@@ -1,0 +1,7 @@
+requests
+PyYAML
+python-dotenv
+pytest
+PyJWT
+websockets
+openpyxl

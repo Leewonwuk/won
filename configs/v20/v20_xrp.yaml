@@ -1,0 +1,27 @@
+symbol: XRP
+spot_symbol: XRPUSDT
+futures_symbol: XRPUSDT
+
+capital_usdt: 500.0
+position_fraction: 0.8
+leverage: 2
+
+entry_funding_rate: 0.0003
+max_basis_rate: 0.001
+
+exit_funding_rate: 0.00005
+stop_loss_usdt: -30.0
+danger_margin_ratio: 0.20
+max_hold_hours: 168.0
+
+reentry_cooldown_sec: 300.0
+emergency_cooldown_sec: 3600.0
+
+spot_fee_rate: 0.00075
+futures_fee_rate: 0.0002
+
+dry_run: true
+poll_interval_sec: 60.0
+pre_funding_check_sec: 300.0
+telegram_summary_sec: 1800.0
+log_dir: logs/v20

@@ -1,0 +1,39 @@
+symbol: TRX
+upbit_market: KRW-TRX
+binance_symbol: TRXUSDT
+# REST 실패 시에만 사용. 실제 시장(2025–2026)에 가깝게 두어 왜곡 완화.
+fx_krw_per_usdt: 1500.0
+# Upbit KRW-USDT 티커로 주기적 갱신(초). 0이면 매 루프마다 조회.
+fx_refresh_sec: 45
+# 0이면 비활성. 포지션 고착 방지용 강제 청산(초).
+max_position_hold_sec: 14400
+
+# Use the tuned threshold from backtests.
+entry_threshold_rate: 0.0043
+exit_threshold_rate: 0.0006
+loop_interval_sec: 1.0
+marketdata_mode: tick
+cooldown_sec: 10
+
+# Keep each cycle very small for first live validation.
+trade_size_base: 100.0
+
+fee_upbit_rate: 0.0005
+fee_binance_rate: 0.0004
+slippage_upbit_rate: 0.0009
+slippage_binance_rate: 0.0009
+
+transfer_fee_upbit_to_binance_base: 1.0
+transfer_fee_binance_to_upbit_base: 1.0
+
+mode: live
+enable_live_orders: true
+live_dry_run: false
+order_timeout_sec: 3.0
+
+risk:
+  # Hard cap requested by user: <= 50,000 KRW per order.
+  max_notional_krw: 50000
+  # Conservative stop for tiny-live test.
+  max_daily_loss_krw: 30000
+  max_open_positions: 1

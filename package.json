@@ -1,0 +1,11 @@
+{
+  "name": "arb",
+  "private": true,
+  "description": "Dev-only deps for Cursor MCP (qmd). Run: npm install",
+  "scripts": {
+    "postinstall": "node -e \"require('fs').mkdirSync(require('path').join(process.cwd(),'.qmd'),{recursive:true})\""
+  },
+  "devDependencies": {
+    "@tobilu/qmd": "2.0.1"
+  }
+}

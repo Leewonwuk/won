@@ -1,0 +1,34 @@
+symbol: ADA
+binance_symbol_usdt: ADAUSDT
+binance_symbol_usdc: ADAUSDC
+
+initial_usdt: 1199.0
+initial_usdc: 1199.0
+
+dt_entry_threshold_rate: 0.0017
+dc_entry_threshold_rate: 0.0017
+
+entry_split_fraction: 0.25
+
+fee_rate: 0.00075            # BNB 25% 할인 taker (0.1% × 0.75)
+fee_maker_rate: 0.00075      # BNB 25% 할인 maker (0.1% × 0.75)
+use_maker_fees: true
+
+slippage_rate: 0.0
+
+ioc_price_buffer_rate: 0.0002
+ioc_miss_cooldown_sec: 5.0
+
+use_speculative_leg_b: false
+leg_b_abort_threshold_rate: -0.99
+leg_b_stop_loss_rate: 0.003
+leg_b_reprice_on_drop: true
+
+emergency_taker_fee_rate: 0.00075
+emergency_slippage_rate: 0.0002
+
+rebalance_skew_threshold: 0.80
+rebalance_min_interval_sec: 0
+
+order_timeout_sec: 60
+price_mode: close
