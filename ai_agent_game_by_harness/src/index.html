@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Go Running — 고라니 달리기</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background-color: #1a1a2e;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100vw;
+      height: 100vh;
+      min-height: 100dvh;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    #game-root {
+      width: 100vw;
+      height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      touch-action: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="loading" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;font-family:monospace;font-size:14px;text-align:center;">
+    Loading...<br><span id="load-status" style="color:#aaa;font-size:11px;"></span>
+  </div>
+  <div id="game-root"></div>
+  <script>
+    window.onerror = function(msg, src, line) {
+      document.getElementById('load-status').textContent = 'ERROR: ' + msg + ' (' + src + ':' + line + ')';
+    };
+    window.addEventListener('unhandledrejection', function(e) {
+      document.getElementById('load-status').textContent = 'Promise error: ' + e.reason;
+    });
+    document.getElementById('load-status').textContent = 'CDN 로딩 중...';
+  </script>
+  <script type="module" src="game/main.js"></script>
+</body>
+</html>

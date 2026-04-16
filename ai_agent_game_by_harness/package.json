@@ -1,0 +1,8 @@
+{
+  "name": "go-running",
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "npx serve src -l 3000",
+    "check": "node --check src/game/main.js && node --check src/game/config.js && node --check src/game/scenes/BootScene.js && node --check src/game/scenes/IntroScene.js && node --check src/game/scenes/GameScene.js && node --check src/game/scenes/GameOverScene.js && node --check src/game/objects/Gorani.js && node --check src/game/objects/Obstacle.js && node --check src/game/objects/Item.js && node --check src/game/systems/AudioSystem.js && node --check src/game/systems/DayNightSystem.js && node --check src/game/systems/HelperSystem.js"
+  }
+}
