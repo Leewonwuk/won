@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>동양 판타지 한의원 — 온천약방 이야기</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Serif+KR:wght@500;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      background-color: #0b0a16;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      min-height: 100dvh;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      font-family: 'Noto Serif KR', serif;
+      color: #e8dcc4;
+    }
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-image:
+        radial-gradient(circle at 20% 20%, #1a1530 0%, transparent 40%),
+        radial-gradient(circle at 80% 70%, #241a2e 0%, transparent 50%),
+        linear-gradient(180deg, #0b0a16 0%, #141022 100%);
+    }
+    #game-root {
+      width: 100vw;
+      height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      touch-action: none;
+      box-shadow: 0 0 40px rgba(214, 162, 89, 0.25), 0 8px 32px rgba(0, 0, 0, 0.6);
+      border: 2px solid #5a4026;
+      border-radius: 6px;
+    }
+    #loading {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      color: #e8dcc4;
+      font-family: 'Noto Serif KR', serif;
+      font-size: 16px;
+      text-align: center;
+      z-index: 100;
+    }
+    #loading small { color: #a39074; font-size: 11px; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <div id="loading">
+    동양 판타지 한의원 불러오는 중…<br>
+    <small id="load-status">CDN 로딩 중...</small>
+  </div>
+  <div id="game-root"></div>
+  <script>
+    window.onerror = function(msg, src, line) {
+      var s = document.getElementById('load-status');
+      if (s) s.textContent = 'ERROR: ' + msg + ' (' + src + ':' + line + ')';
+    };
+    window.addEventListener('unhandledrejection', function(e) {
+      var s = document.getElementById('load-status');
+      if (s) s.textContent = 'Promise error: ' + e.reason;
+    });
+  </script>
+  <script type="module" src="game/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "oriental-fantasy-hanuiwon",
+  "version": "1.0.0",
+  "description": "동양 판타지 한의원 경영 시뮬 — 온천약방 이야기 (Phaser 3 + Tone.js, 빌드리스)",
+  "private": true,
+  "scripts": {
+    "start": "npx serve src-v0.7 -l 3000",
+    "serve": "npx serve src-v0.7 -l 3000",
+    "start-v07": "npx serve src-v0.7 -l 3000",
+    "start-v06": "npx serve src-v0.6 -l 3006",
+    "start-v05": "npx serve src-v0.5 -l 3005"
+  },
+  "keywords": ["phaser", "tone.js", "pixel-art", "management-sim", "kairosoft"],
+  "author": "",
+  "license": "MIT"
+}
