@@ -1,0 +1,49 @@
+[
+  {
+    "key": "tex_building_moxa",
+    "file": "moxa.png",
+    "type": "spritesheet",
+    "frames": 16,
+    "fw": 64,
+    "fh": 128
+  },
+  {
+    "key": "tex_building_acu",
+    "file": "acu.png",
+    "type": "image"
+  },
+  {
+    "key": "tex_building_haewoso",
+    "file": "haewoso.png",
+    "type": "image"
+  },
+  {
+    "key": "tex_building_gukbap",
+    "file": "gukbap.png",
+    "type": "spritesheet",
+    "frames": 12,
+    "fw": 64,
+    "fh": 128
+  },
+  {
+    "key": "tex_building_pine",
+    "file": "pine.png",
+    "type": "spritesheet",
+    "frames": 21,
+    "fw": 64,
+    "fh": 128
+  },
+  {
+    "key": "tex_building_well",
+    "file": "well.png",
+    "type": "spritesheet",
+    "frames": 5,
+    "fw": 64,
+    "fh": 128
+  },
+  {
+    "key": "tex_tile_maru",
+    "file": "maru.png",
+    "type": "image"
+  }
+]
