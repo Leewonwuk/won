@@ -26,9 +26,13 @@ class V12ConfigV2:
 
     entry_split_fraction: float = 0.25  # 매 시그널 당 총 스테이블의 몇 % 사용
 
-    # 수수료 (레그 당)
+    # 수수료 (레그 당) — Standard pair (USDT pair) 기준
     fee_rate: float = 0.0004
     fee_maker_rate: float = 0.0002
+    # USDC pair 별도 수수료 (Binance USDC Taker promo 적용)
+    # 미설정 시 fee_rate / fee_maker_rate 사용 (하위 호환)
+    fee_usdc_pair_taker: Optional[float] = None
+    fee_usdc_pair_maker: Optional[float] = None
     use_maker_fees: bool = False
     slippage_rate: float = 0.0
     # 지정가 체결률 (0.0~1.0). 1.0=항상 체결, 0.8=80%만 체결
@@ -97,6 +101,16 @@ def load_v12_config_v2(path: str) -> V12ConfigV2:
         entry_split_fraction=float(data.get("entry_split_fraction", 0.25)),
         fee_rate=float(data.get("fee_rate", 0.0004)),
         fee_maker_rate=float(data.get("fee_maker_rate", 0.0002)),
+        fee_usdc_pair_taker=(
+            float(data["fee_usdc_pair_taker"])
+            if "fee_usdc_pair_taker" in data
+            else None
+        ),
+        fee_usdc_pair_maker=(
+            float(data["fee_usdc_pair_maker"])
+            if "fee_usdc_pair_maker" in data
+            else None
+        ),
         use_maker_fees=bool(data.get("use_maker_fees", False)),
         slippage_rate=float(data.get("slippage_rate", 0.0)),
         fill_rate=float(data.get("fill_rate", 1.0)),

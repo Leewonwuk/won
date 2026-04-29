@@ -94,6 +94,13 @@ def run_backtest_v2(csv_path: str, cfg: V12ConfigV2) -> BacktestV2Result:
     rows = _load_rows(csv_path)
     if not rows:
         raise ValueError(f"No data in {csv_path}")
+    return run_backtest_v2_from_rows(rows, cfg)
+
+
+def run_backtest_v2_from_rows(rows: list[dict], cfg: V12ConfigV2) -> BacktestV2Result:
+    """WFO 등에서 재사용하는 rows 직접 입력 버전. 기존 run_backtest_v2와 동일 로직."""
+    if not rows:
+        raise ValueError("empty rows")
 
     bal = BalanceV2(usdt=cfg.initial_usdt, usdc=cfg.initial_usdc)
     start_equity = cfg.initial_usdt + cfg.initial_usdc
@@ -110,7 +117,19 @@ def run_backtest_v2(csv_path: str, cfg: V12ConfigV2) -> BacktestV2Result:
     equity_timeline: list[tuple[datetime, float]] = []
 
     eff_fee = cfg.fee_maker_rate if cfg.use_maker_fees else cfg.fee_rate
-    fee_stack = 2.0 * (eff_fee + cfg.slippage_rate)
+    # 페어별 fee (USDC pair Taker promo 반영). 미설정 시 legacy fee_rate fallback.
+    usdc_taker = cfg.fee_usdc_pair_taker if cfg.fee_usdc_pair_taker is not None else cfg.fee_rate
+    usdc_maker = (
+        cfg.fee_usdc_pair_maker
+        if (cfg.use_maker_fees and cfg.fee_usdc_pair_maker is not None)
+        else eff_fee
+    )
+    # DT: LegA=USDC pair taker(promo), LegB=USDT pair maker
+    dt_fee_stack = usdc_taker + eff_fee + 2.0 * cfg.slippage_rate
+    # DC: LegA=USDT pair taker, LegB=USDC pair maker
+    dc_fee_stack = cfg.fee_rate + usdc_maker + 2.0 * cfg.slippage_rate
+    # legacy fee_stack: GTC fill outcome 비교용 (보수적으로 둘 중 큰 값)
+    fee_stack = max(dt_fee_stack, dc_fee_stack)
     effective_fill_rate = 1.0 if not cfg.use_maker_fees else cfg.fill_rate
     rng = random.Random(42)
 
@@ -157,6 +176,8 @@ def run_backtest_v2(csv_path: str, cfg: V12ConfigV2) -> BacktestV2Result:
             fee_rate=eff_fee,
             slippage_rate=cfg.slippage_rate,
             entry_split_fraction=cfg.entry_split_fraction,
+            dt_fee_stack=dt_fee_stack,
+            dc_fee_stack=dc_fee_stack,
         )
 
         reason_counts[decision.reason] = reason_counts.get(decision.reason, 0) + 1
@@ -196,19 +217,21 @@ def run_backtest_v2(csv_path: str, cfg: V12ConfigV2) -> BacktestV2Result:
                     fill_mid_ut, fill_mid_uc = mid_ut, mid_uc
 
                 if is_dt:
-                    # DT: Leg A=BTCUSDC(시그널가), Leg B=BTCUSDT(fill봉가)
+                    # DT: LegA=BTCUSDC(USDC pair, taker promo), LegB=BTCUSDT(maker)
                     ev = bal.execute_dt_trade(
                         symbol=cfg.symbol, mid_usdt=fill_mid_ut, mid_usdc=mid_uc,
                         fee_rate=eff_fee, slippage_rate=cfg.slippage_rate,
                         fraction=cfg.entry_split_fraction, ts=ts_raw,
+                        leg_a_fee_rate=usdc_taker, leg_b_fee_rate=eff_fee,
                     )
                     dt_count += 1
                 else:
-                    # DC: Leg A=BTCUSDT(시그널가), Leg B=BTCUSDC(fill봉가)
+                    # DC: LegA=BTCUSDT(taker), LegB=BTCUSDC(USDC pair maker, promo 없음)
                     ev = bal.execute_dc_trade(
                         symbol=cfg.symbol, mid_usdt=mid_ut, mid_usdc=fill_mid_uc,
                         fee_rate=eff_fee, slippage_rate=cfg.slippage_rate,
                         fraction=cfg.entry_split_fraction, ts=ts_raw,
+                        leg_a_fee_rate=cfg.fee_rate, leg_b_fee_rate=usdc_maker,
                     )
                     dc_count += 1
                 events.append(ev)

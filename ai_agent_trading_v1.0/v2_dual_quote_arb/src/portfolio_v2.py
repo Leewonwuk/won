@@ -71,9 +71,13 @@ class BalanceV2:
         slippage_rate: float,
         fraction: float,
         ts: str = "",
+        leg_a_fee_rate: float | None = None,
+        leg_b_fee_rate: float | None = None,
     ) -> TradeEventV2:
         """DT 프리미엄: USDC→BTC(USDC시장)→USDT(USDT시장).
 
+        leg_a_fee_rate / leg_b_fee_rate: 페어별 fee 미지정 시 fee_rate fallback.
+        DT의 LegA는 USDC pair (Taker promo 0.07125% 적용 가능), LegB는 USDT pair.
         notional = (usdt + usdc) × fraction (USDC로 충당)
         """
         if not ts:
@@ -81,19 +85,21 @@ class BalanceV2:
 
         premium = (mid_usdt - mid_usdc) / mid_usdc if mid_usdc > 0 else 0.0
         fraction = max(0.0, min(float(fraction), 1.0))
+        leg_a = leg_a_fee_rate if leg_a_fee_rate is not None else fee_rate
+        leg_b = leg_b_fee_rate if leg_b_fee_rate is not None else fee_rate
 
         notional = (self.usdt + self.usdc) * fraction
-        self._ensure_usdc(notional)  # USDC 부족 시 USDT에서 무료 선스왑
+        self._ensure_usdc(notional)
 
-        # 1단계: notional USDC로 BTC 매수 (BTCUSDC 시장, taker 기준)
-        eff_buy = mid_usdc * (1.0 + fee_rate + slippage_rate)
+        # LegA: notional USDC → BTC (BTCUSDC 시장)
+        eff_buy = mid_usdc * (1.0 + leg_a + slippage_rate)
         btc_qty = notional / eff_buy
-        fee_buy = btc_qty * mid_usdc * (fee_rate + slippage_rate)
+        fee_buy = btc_qty * mid_usdc * (leg_a + slippage_rate)
 
-        # 2단계: 그 BTC를 USDT로 매도 (BTCUSDT 시장)
-        eff_sell = mid_usdt * (1.0 - fee_rate - slippage_rate)
+        # LegB: BTC → USDT (BTCUSDT 시장)
+        eff_sell = mid_usdt * (1.0 - leg_b - slippage_rate)
         usdt_received = btc_qty * eff_sell
-        fee_sell = btc_qty * mid_usdt * (fee_rate + slippage_rate)
+        fee_sell = btc_qty * mid_usdt * (leg_b + slippage_rate)
 
         self.usdc = max(self.usdc - notional, 0.0)
         self.usdt += usdt_received
@@ -129,9 +135,12 @@ class BalanceV2:
         slippage_rate: float,
         fraction: float,
         ts: str = "",
+        leg_a_fee_rate: float | None = None,
+        leg_b_fee_rate: float | None = None,
     ) -> TradeEventV2:
         """DC 프리미엄: USDT→BTC(USDT시장)→USDC(USDC시장).
 
+        DC의 LegA는 USDT pair, LegB는 USDC pair (Maker는 promo 없음).
         notional = (usdt + usdc) × fraction (USDT로 충당)
         """
         if not ts:
@@ -139,19 +148,21 @@ class BalanceV2:
 
         premium = (mid_usdt - mid_usdc) / mid_usdc if mid_usdc > 0 else 0.0
         fraction = max(0.0, min(float(fraction), 1.0))
+        leg_a = leg_a_fee_rate if leg_a_fee_rate is not None else fee_rate
+        leg_b = leg_b_fee_rate if leg_b_fee_rate is not None else fee_rate
 
         notional = (self.usdt + self.usdc) * fraction
-        self._ensure_usdt(notional)  # USDT 부족 시 USDC에서 무료 선스왑
+        self._ensure_usdt(notional)
 
-        # 1단계: notional USDT로 BTC 매수 (BTCUSDT 시장)
-        eff_buy = mid_usdt * (1.0 + fee_rate + slippage_rate)
+        # LegA: USDT → BTC (BTCUSDT 시장)
+        eff_buy = mid_usdt * (1.0 + leg_a + slippage_rate)
         btc_qty = notional / eff_buy
-        fee_buy = btc_qty * mid_usdt * (fee_rate + slippage_rate)
+        fee_buy = btc_qty * mid_usdt * (leg_a + slippage_rate)
 
-        # 2단계: 그 BTC를 USDC로 매도 (BTCUSDC 시장)
-        eff_sell = mid_usdc * (1.0 - fee_rate - slippage_rate)
+        # LegB: BTC → USDC (BTCUSDC 시장)
+        eff_sell = mid_usdc * (1.0 - leg_b - slippage_rate)
         usdc_received = btc_qty * eff_sell
-        fee_sell = btc_qty * mid_usdc * (fee_rate + slippage_rate)
+        fee_sell = btc_qty * mid_usdc * (leg_b + slippage_rate)
 
         self.usdt = max(self.usdt - notional, 0.0)
         self.usdc += usdc_received

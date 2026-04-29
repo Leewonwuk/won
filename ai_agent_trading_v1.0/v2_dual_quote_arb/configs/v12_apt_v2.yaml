@@ -1,25 +1,47 @@
-symbol: DOGE
-binance_symbol_usdt: DOGEUSDT
-binance_symbol_usdc: DOGEUSDC
+# v1.2 v2 — APT USDT/USDC 스테이블 전용 (통합 풀 모드)
+# 신규 투입 (2026-04-19): Day 4 백테 상위 + flash contamination 0% + consistency 1.00
+#
+# APT 특성:
+#   - Binance APTUSDT / APTUSDC 양측 존재, 중간 유동성
+#   - 현재가 ≈ $0.96, tick $0.001 (≈0.10%/틱 — 틱이 거칠다)
+#   - stepSize 0.01 (최소 주문 0.01 APT), minNotional $5
+#   - IOC 버퍼는 최소 1틱(0.001) 이상 필요 → 0.0012 사용
+
+symbol: APT
+binance_symbol_usdt: APTUSDT
+binance_symbol_usdc: APTUSDC
+
 initial_usdt: 1199.0
 initial_usdc: 1199.0
+
 dt_entry_threshold_rate: 0.001663   # DT fee_stack 0.14625% + margin 0.0175%
 dc_entry_threshold_rate: 0.0017     # DC fee_stack 0.150% + margin 0.020%
+
 entry_split_fraction: 0.25
+
 fee_rate: 0.00075            # USDT pair Taker, BNB 25% 할인 (0.1% × 0.75)
 fee_maker_rate: 0.00075      # USDT pair Maker, BNB 25% 할인 (0.1% × 0.75)
 fee_usdc_pair_taker: 0.0007125   # USDC pair Taker, USDC promo + BNB (0.095% × 0.75)
 fee_usdc_pair_maker: 0.00075     # USDC pair Maker, promo 없음 (0.1% × 0.75)
 use_maker_fees: true
+
 slippage_rate: 0.0
-emergency_taker_fee_rate: 0.00075
-emergency_slippage_rate: 0.0002
-ioc_price_buffer_rate: 0.0002
+
+# APT tick=$0.001 (≈0.10%/틱). 최소 1틱 필요, 1.2틱 여유 사용
+ioc_price_buffer_rate: 0.0012
+ioc_miss_cooldown_sec: 5.0
+
 use_speculative_leg_b: false
 leg_b_abort_threshold_rate: -0.99
+# MVP: 전 9코인 stop-loss 0.25% 통일
 leg_b_stop_loss_rate: 0.0025
 leg_b_reprice_on_drop: true
+
+emergency_taker_fee_rate: 0.00075
+emergency_slippage_rate: 0.0002
+
 rebalance_skew_threshold: 0.80
 rebalance_min_interval_sec: 0
+
 order_timeout_sec: 60
 price_mode: close
