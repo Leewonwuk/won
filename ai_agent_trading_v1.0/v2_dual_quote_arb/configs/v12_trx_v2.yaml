@@ -3,11 +3,13 @@ binance_symbol_usdt: TRXUSDT
 binance_symbol_usdc: TRXUSDC
 initial_usdt: 1199.0
 initial_usdc: 1199.0
-dt_entry_threshold_rate: 0.0017
-dc_entry_threshold_rate: 0.0017
+dt_entry_threshold_rate: 0.001663   # DT fee_stack 0.14625% + margin 0.0175%
+dc_entry_threshold_rate: 0.0017     # DC fee_stack 0.150% + margin 0.020%
 entry_split_fraction: 0.25
-fee_rate: 0.00075            # BNB 25% 할인 taker (0.1% × 0.75)
-fee_maker_rate: 0.00075      # BNB 25% 할인 maker (0.1% × 0.75)
+fee_rate: 0.00075            # USDT pair Taker, BNB 25% 할인 (0.1% × 0.75)
+fee_maker_rate: 0.00075      # USDT pair Maker, BNB 25% 할인 (0.1% × 0.75)
+fee_usdc_pair_taker: 0.0007125   # USDC pair Taker, USDC promo + BNB (0.095% × 0.75)
+fee_usdc_pair_maker: 0.00075     # USDC pair Maker, promo 없음 (0.1% × 0.75)
 use_maker_fees: true
 slippage_rate: 0.0
 emergency_taker_fee_rate: 0.00075
@@ -15,7 +17,7 @@ emergency_slippage_rate: 0.0002
 ioc_price_buffer_rate: 0.0002
 use_speculative_leg_b: false
 leg_b_abort_threshold_rate: -0.99
-leg_b_stop_loss_rate: 0.003
+leg_b_stop_loss_rate: 0.0025
 leg_b_reprice_on_drop: true
 rebalance_skew_threshold: 0.80
 rebalance_min_interval_sec: 0

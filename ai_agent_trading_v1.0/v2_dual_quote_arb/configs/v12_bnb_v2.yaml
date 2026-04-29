@@ -5,13 +5,15 @@ binance_symbol_usdc: BNBUSDC
 initial_usdt: 1199.0
 initial_usdc: 1199.0
 
-dt_entry_threshold_rate: 0.0017
-dc_entry_threshold_rate: 0.0017
+dt_entry_threshold_rate: 0.001663   # DT fee_stack 0.14625% + margin 0.0175%
+dc_entry_threshold_rate: 0.0017     # DC fee_stack 0.150% + margin 0.020%
 
 entry_split_fraction: 0.25
 
-fee_rate: 0.00075            # BNB 25% 할인 taker (0.1% × 0.75)
-fee_maker_rate: 0.00075      # BNB 25% 할인 maker (0.1% × 0.75)
+fee_rate: 0.00075            # USDT pair Taker, BNB 25% 할인 (0.1% × 0.75)
+fee_maker_rate: 0.00075      # USDT pair Maker, BNB 25% 할인 (0.1% × 0.75)
+fee_usdc_pair_taker: 0.0007125   # USDC pair Taker, USDC promo + BNB (0.095% × 0.75)
+fee_usdc_pair_maker: 0.00075     # USDC pair Maker, promo 없음 (0.1% × 0.75)
 use_maker_fees: true
 
 slippage_rate: 0.0
@@ -23,8 +25,8 @@ ioc_miss_cooldown_sec: 30.0
 
 use_speculative_leg_b: false
 leg_b_abort_threshold_rate: -0.99
-# BNB 변동성 중간, BNBUSDC Leg B 대기 길어질 수 있으므로 0.4%
-leg_b_stop_loss_rate: 0.004
+# MVP: 전 9코인 stop-loss 0.25% 통일 (2026-04-19, 기존 0.4%)
+leg_b_stop_loss_rate: 0.0025
 leg_b_reprice_on_drop: true
 
 emergency_taker_fee_rate: 0.00075

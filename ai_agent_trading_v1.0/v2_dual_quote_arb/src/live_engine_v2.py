@@ -1,4 +1,4 @@
-"""v1.28 라이브 트레이딩 엔진.
+"""v1.3 라이브 트레이딩 엔진.
 
 상태 머신: IDLE → LEG_A_PENDING → LEG_B_PENDING → IDLE
 
@@ -26,6 +26,7 @@ from datetime import datetime, timezone, timedelta
 _KST = timezone(timedelta(hours=9))
 from enum import Enum
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from src.exchanges.binance_trading_client import BinanceTradingClient
 from src.notifications.telegram_notifier import send_telegram, send_telegram_document
@@ -34,6 +35,12 @@ from src.v12.config_v2 import V12ConfigV2
 from src.v12.global_lock import GlobalTradeLock
 from src.v12.price_feed import PriceFeed
 from src.v12.ws_order_client import BinanceTradingWsClient
+
+if TYPE_CHECKING:
+    from src.risk_v131.manager import RiskV131SymbolBinding
+    from src.validation_artifacts.recorder import ValidationArtifactRecorder
+    from src.regime.manager import RegimeThresholdManager
+    from src.capital_allocation.allocator import CapitalAllocator
 
 # WS 이벤트가 없을 때 REST order status 폴백 최소 간격(초).
 # WS 정상 시엔 거의 호출되지 않음.
@@ -88,6 +95,18 @@ class V12LiveEngineV2:
     suppress_hourly_telegram: bool = False
     # 통합 풀 운영 시 동시 진입 방지 락 (None = 분리 운영 모드)
     global_lock: GlobalTradeLock | None = None
+    # v1.31 Phase A risk 확장 (per-pair throttle + fleet kill switch + merkle log).
+    # None 또는 config.enabled=False이면 완전 no-op → 기존 경로 그대로.
+    risk_v131: "RiskV131SymbolBinding | None" = None
+    # v1.31 Phase 3 validation artifacts (trade_intents / risk_checks / strategy_checkpoints).
+    # None 또는 config.enabled=False이면 완전 no-op.
+    validation_recorder: "ValidationArtifactRecorder | None" = None
+    # v1.31 Phase A regime-conditional threshold (volatility bucket → dt/dc threshold).
+    # None 이면 cfg 기본값 그대로 사용 → 기존 경로 유지.
+    regime_manager: "RegimeThresholdManager | None" = None
+    # v1.31 Phase C capital allocator (코인별 weight로 entry notional 조절).
+    # None 이면 multiplier=1.0 → 기존 경로.
+    capital_allocator: "CapitalAllocator | None" = None
 
     # 잔고
     usdt: float = field(default=0.0, init=False)
@@ -165,6 +184,11 @@ class V12LiveEngineV2:
     _spec_leg_b_repriced: bool = field(default=False, init=False)
     # 최초 잔고 동기화 여부 (수익 복리 반영을 위한 초기/주기 분리)
     _initial_sync_done: bool = field(default=False, init=False)
+    # Latency 계측 (ns 단위 monotonic)
+    _last_wake_trigger_ns: int = field(default=0, init=False)
+    _leg_a_decide_ns: int = field(default=0, init=False)
+    _leg_a_submit_ns: int = field(default=0, init=False)
+    _latency_csv_path: str = field(default="", init=False)
 
     def __post_init__(self) -> None:
         Path(self.log_dir).mkdir(parents=True, exist_ok=True)
@@ -174,6 +198,13 @@ class V12LiveEngineV2:
         self._state_path = f"{self.log_dir}/engine_state_{sym}.json"
         self._ioc_miss_xlsx_path = f"{self.log_dir}/ioc_miss_debug_{sym}_{tag}.xlsx"
         self._event_xlsx_path = f"{self.log_dir}/event_debug_{sym}_{tag}.xlsx"
+        self._latency_csv_path = f"{self.log_dir}/latency_v2_{sym}_{tag}.csv"
+        with open(self._latency_csv_path, "w", encoding="utf-8-sig", newline="") as f:
+            csv.writer(f).writerow([
+                "ts_kst", "symbol", "action", "signal_pct",
+                "wake_to_decide_ms", "decide_to_submit_ms", "submit_to_ack_ms",
+                "total_ms", "outcome", "via_ws",
+            ])
         # 헤더 작성
         with open(self._csv_path, "w", encoding="utf-8-sig", newline="") as f:
             csv.DictWriter(f, fieldnames=_CSV_FIELDS).writeheader()
@@ -212,6 +243,35 @@ class V12LiveEngineV2:
 
     def _eff_fee(self) -> float:
         return self.cfg.fee_maker_rate if self.cfg.use_maker_fees else self.cfg.fee_rate
+
+    def _is_usdc_pair(self, sym: str) -> bool:
+        return sym == self.cfg.binance_symbol_usdc
+
+    def _taker_fee_for_pair(self, sym: str) -> float:
+        if self._is_usdc_pair(sym) and self.cfg.fee_usdc_pair_taker is not None:
+            return self.cfg.fee_usdc_pair_taker
+        return self.cfg.fee_rate
+
+    def _maker_fee_for_pair(self, sym: str) -> float:
+        if not self.cfg.use_maker_fees:
+            return self._taker_fee_for_pair(sym)
+        if self._is_usdc_pair(sym) and self.cfg.fee_usdc_pair_maker is not None:
+            return self.cfg.fee_usdc_pair_maker
+        return self.cfg.fee_maker_rate
+
+    def _emergency_taker_fee_for_pair(self, sym: str) -> float:
+        if self._is_usdc_pair(sym) and self.cfg.fee_usdc_pair_taker is not None:
+            return self.cfg.fee_usdc_pair_taker
+        return self.cfg.emergency_taker_fee_rate
+
+    def _directional_fee_stack(self, is_dt: bool) -> float:
+        leg_a_sym = self.cfg.binance_symbol_usdc if is_dt else self.cfg.binance_symbol_usdt
+        leg_b_sym = self.cfg.binance_symbol_usdt if is_dt else self.cfg.binance_symbol_usdc
+        return (
+            self._taker_fee_for_pair(leg_a_sym)
+            + self._maker_fee_for_pair(leg_b_sym)
+            + 2.0 * self.cfg.slippage_rate
+        )
 
     def sync_balances(self) -> None:
         balances = self.binance.get_spot_balances()
@@ -301,6 +361,30 @@ class V12LiveEngineV2:
     def _premium(self, mid_ut: float, mid_uc: float) -> float:
         return (mid_ut - mid_uc) / mid_uc if mid_uc > 0 else 0.0
 
+    def _log_latency(self, outcome: str, via_ws: bool) -> None:
+        """4-phase latency CSV 기록. 각 phase 실측 없으면 -1."""
+        try:
+            ack_ns = time.monotonic_ns()
+            w2d = (self._leg_a_decide_ns - self._last_wake_trigger_ns) / 1e6 \
+                if (self._last_wake_trigger_ns and self._leg_a_decide_ns) else -1.0
+            d2s = (self._leg_a_submit_ns - self._leg_a_decide_ns) / 1e6 \
+                if (self._leg_a_decide_ns and self._leg_a_submit_ns) else -1.0
+            s2a = (ack_ns - self._leg_a_submit_ns) / 1e6 \
+                if self._leg_a_submit_ns else -1.0
+            total = (ack_ns - self._last_wake_trigger_ns) / 1e6 \
+                if self._last_wake_trigger_ns else -1.0
+            action_str = self.current_action.name if self.current_action else ""
+            row = [
+                self._now_str(), self.cfg.symbol, action_str,
+                f"{self.entry_premium * 100:.4f}",
+                f"{w2d:.2f}", f"{d2s:.2f}", f"{s2a:.2f}", f"{total:.2f}",
+                outcome, "1" if via_ws else "0",
+            ]
+            with open(self._latency_csv_path, "a", encoding="utf-8-sig", newline="") as f:
+                csv.writer(f).writerow(row)
+        except Exception as e:
+            log.debug(f"latency 기록 실패: {e}")
+
     def _on_price_update(self, sym: str, bid: float, ask: float) -> None:
         """WS bookTicker 콜백 (WS asyncio 스레드에서 호출). 빠른 경로 유지."""
         if self.state != TradeState.IDLE:
@@ -330,6 +414,7 @@ class V12LiveEngineV2:
         else:
             return
         if exec_premium >= threshold:
+            self._last_wake_trigger_ns = time.monotonic_ns()
             self._wake_event.set()
 
     def _on_fill(self, order_id: int, ev: dict) -> None:
@@ -349,18 +434,17 @@ class V12LiveEngineV2:
         elapsed_sec: float,
         note: str = "",
     ) -> None:
-        eff_fee = self._eff_fee()
+        # Leg A는 IOC = taker, Leg B는 maker(정상) 또는 taker(비상)
+        # 페어별 USDC promo 반영: USDC pair taker 0.07125% (BNB 25% + USDC promo)
+        leg_a_taker = self._taker_fee_for_pair(leg_a_symbol)
+        leg_b_maker = self._maker_fee_for_pair(leg_b_symbol)
+        leg_b_emergency = self._emergency_taker_fee_for_pair(leg_b_symbol)
         is_emergency = "EMERGENCY" in note or "STOP_LOSS" in note
-        # Leg A는 IOC = taker 수수료
-        # 정상거래 Leg B는 지정가 = maker 수수료
-        # 비상청산/스탑로스 Leg B는 시장가 = taker 수수료
         if received > 0 and not is_emergency:
-            fee_est = self.leg_a_notional * self.cfg.fee_rate + received * eff_fee
+            fee_est = self.leg_a_notional * leg_a_taker + received * leg_b_maker
         else:
-            # 비상청산: received는 시장가 수취금액, emergency_taker_fee_rate로 재계산
-            # received=0인 경우(극히 드묾): 청산가 ≈ 매수가로 근사
             leg_b_notional = received if received > 0 else self.leg_a_notional
-            fee_est = self.leg_a_notional * self.cfg.fee_rate + leg_b_notional * self.cfg.emergency_taker_fee_rate
+            fee_est = self.leg_a_notional * leg_a_taker + leg_b_notional * leg_b_emergency
         self._log_seq += 1
         equity = self.usdt + self.usdc
         row = {
@@ -461,7 +545,7 @@ class V12LiveEngineV2:
         dc_need = max(self.cfg.dc_entry_threshold_rate, fee_stack_threshold)
         span_min = max(1, int(round(self.telegram_summary_sec / 60.0)))
         self._notify(
-            f"⏰ <b>v1.28 운영 요약 [{self.cfg.symbol}] ({span_min}분)</b>\n"
+            f"⏰ <b>v1.3 운영 요약 [{self.cfg.symbol}] ({span_min}분)</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"🔄 이번 구간 거래: {self._hour_trade_count}회\n"
             f"💵 이번 구간 순수익: {self._usd_krw(self._hour_pnl)}  <i>(BNB 수수료 포함)</i>\n"
@@ -830,11 +914,11 @@ class V12LiveEngineV2:
         abort_str = f"{abort_thr:.4%}" if abort_thr is not None else f"{fee_stack:.4%}(fee_stack)"
         if not self.suppress_hourly_telegram:
             self._notify(
-                f"🚀 v1.28 라이브 엔진 시작 ({mode}) [{sym}]\n\n"
-                f"[v1.28 업데이트]\n"
-                f"  · 통합 풀 모드: TRX + DOGE + XRP 단일 자본 풀 운영\n"
-                f"  · GlobalLock: 1개 코인 거래 중 나머지 진입 차단 (선착순)\n"
-                f"  · 풀 자본: 644 USDT + 644 USDC / 거래당 notional 322 USDT\n\n"
+                f"🚀 v1.3 라이브 엔진 시작 ({mode}) [{sym}]\n\n"
+                f"[v1.3 업데이트]\n"
+                f"  · 9코인 확장: TRX/DOGE/XRP/SOL/BNB/ADA + APT/FET/WLD\n"
+                f"  · Stop-loss 전 코인 0.25% 통일 (기존 0.30~0.50% → 0.25%)\n"
+                f"  · GlobalLock: 1개 코인 거래 중 나머지 진입 차단 (선착순)\n\n"
                 f"코인: {sym}  ({self.cfg.binance_symbol_usdt} / {self.cfg.binance_symbol_usdc})\n"
                 f"풀 자본: USDT={self.cfg.initial_usdt:.0f}  USDC={self.cfg.initial_usdc:.0f}\n"
                 f"{'🔒 GlobalLock ON' if self.global_lock is not None else '🔓 GlobalLock OFF'}\n\n"
@@ -848,9 +932,15 @@ class V12LiveEngineV2:
             )
         # IOC/이벤트 요약 주기를 운영요약 주기와 동기화
         self._ioc_summary_sec = self.telegram_summary_sec
-        # 8코인 동시 정기동기화 방지: 심볼별 오프셋으로 분산 (7분 간격)
-        _SYNC_SYMBOLS = ["TRX", "DOGE", "XRP", "SOL", "BNB", "ADA", "LINK", "AVAX"]
-        _sync_offset = _SYNC_SYMBOLS.index(self.cfg.symbol) * 420 if self.cfg.symbol in _SYNC_SYMBOLS else 0
+        # 코인 동시 정기동기화 방지: 심볼별 오프셋으로 분산
+        # spacing은 interval/N로 동적 계산 — 코인 추가 시 overflow 방지 (bug_015 fix)
+        _SYNC_SYMBOLS = ["TRX", "DOGE", "XRP", "SOL", "BNB", "ADA", "APT", "FET", "WLD", "LINK", "AVAX"]
+        _sync_spacing = self._PERIODIC_SYNC_INTERVAL / len(_SYNC_SYMBOLS)  # 11코인 기준 ≈327s
+        _sync_offset = (
+            _SYNC_SYMBOLS.index(self.cfg.symbol) * _sync_spacing
+            if self.cfg.symbol in _SYNC_SYMBOLS
+            else 0
+        )
         self._last_periodic_sync_ts = time.time() - self._PERIODIC_SYNC_INTERVAL + _sync_offset
         self.sync_balances()
 
@@ -1041,7 +1131,7 @@ class V12LiveEngineV2:
             _reb_no = (self.global_lock.rebalance_count + 1) if self.global_lock else 0
             _trigger_info = f"{_last_sym} {_last_dir}" if _last_sym else "—"
             self._notify(
-                f"⚖️ <b>v1.28 리밸런싱 #{_reb_no}</b>\n"
+                f"⚖️ <b>v1.3 리밸런싱 #{_reb_no}</b>\n"
                 f"━━━━━━━━━━━━━━━━━━━━\n"
                 f"Spot {from_amount:.2f} {from_asset} → {to_asset}\n"
                 f"현재: USDT={self.usdt:.2f}  USDC={self.usdc:.2f}\n"
@@ -1158,17 +1248,97 @@ class V12LiveEngineV2:
             f"[IDLE] exec_dc={exec_dc:.5%}  exec_dt={exec_dt:.5%}  "
             f"USDT={self.usdt:.2f}  USDC={self.usdc:.2f}"
         )
+        # ── v1.31 진입 gate ──────────────────────────────────────────────
+        # risk_v131 이 없거나 enabled=False면 can_enter()가 항상 True → 기존 경로 유지.
+        # 활성 시: fleet kill switch trip 또는 per-pair cooldown 중이면 진입 스킵.
+        if self.risk_v131 is not None and not self.risk_v131.can_enter():
+            # validation artifact: risk gate에 블록된 기록
+            if self.validation_recorder is not None:
+                try:
+                    from src.validation_artifacts.schemas import RiskCheckRecord
+                    self.validation_recorder.record_risk_check(RiskCheckRecord(
+                        symbol=self.cfg.symbol,
+                        layer="v131_risk_gate",
+                        result="BLOCK",
+                        reason="kill_switch_or_cooldown",
+                    ))
+                except Exception:
+                    pass
+            return
+        self._leg_a_decide_ns = time.monotonic_ns()
+        # ── v1.31 Phase A: regime-conditional threshold ────────────────
+        # regime_manager 없으면 cfg 기본값 그대로 → 기존 경로 100% 유지.
+        dt_thr = self.cfg.dt_entry_threshold_rate
+        dc_thr = self.cfg.dc_entry_threshold_rate
+        if self.regime_manager is not None:
+            try:
+                # 최신 mid 등록 + bucket 기반 threshold 조회
+                self.regime_manager.update(time.time(), (mid_ut + mid_uc) / 2.0)
+                dt_thr, dc_thr = self.regime_manager.thresholds(
+                    dt_thr, dc_thr
+                )
+            except Exception as e:
+                log.debug(f"[regime] update/thresholds failed: {e}")
         decision = decide_v2(
             mid_usdt=mid_ut, mid_usdc=mid_uc,
             usdt=self.usdt, usdc=self.usdc,
-            dt_entry_threshold_rate=self.cfg.dt_entry_threshold_rate,
-            dc_entry_threshold_rate=self.cfg.dc_entry_threshold_rate,
+            dt_entry_threshold_rate=dt_thr,
+            dc_entry_threshold_rate=dc_thr,
             fee_rate=self._eff_fee(),
             slippage_rate=self.cfg.slippage_rate,
             entry_split_fraction=self.cfg.entry_split_fraction,
             exec_dc_premium=exec_dc,
             exec_dt_premium=exec_dt,
         )
+        # ── v1.31 validation artifact: 진입 결정 기록 ──────────────────
+        # decide_v2 결과를 전부 저장. HOLD도 기록 (심사용 증거 누적).
+        # TODO(v1.32, merged_bug_001): 5개 정확도 결함 — validation_artifacts 모듈
+        # 본격 활성 전 수정 필요. 요약:
+        #   ① threshold_used가 cfg 디폴트 → regime-adjusted dt_thr/dc_thr 사용으로 교체
+        #   ② notional_planned가 cap_mult/risk_mult 미반영 → effective_fraction 사용
+        #   ③ signal_premium == exec_premium 동일식 → mid 기반 premium 분리
+        #   ④ reason_blocked가 "below_threshold_or_hold" 단일 collapse → decision.reason 통과
+        #   ⑤ 레코드가 _start_leg_a 조기 return 전에 발사 → 후속 레코드 또는 위치 재배치
+        # 현재 게이트 OFF + 모듈 부재로 audit 영향 없음.
+        # TODO(v1.32, merged_bug_008): regime threshold가 _on_price_update wake check 및
+        # _start_leg_a revalidation에 미전파 — self._effective_dt_thr / _effective_dc_thr
+        # 캐시해 두 경로에서 사용. 게이트 OFF + regime 모듈 부재로 영향 없음.
+        if self.validation_recorder is not None:
+            try:
+                from src.validation_artifacts.schemas import TradeIntentRecord
+                is_entry = decision.action in (ActionV2.TRADE_DT, ActionV2.TRADE_DC)
+                threshold_used = (
+                    self.cfg.dt_entry_threshold_rate
+                    if decision.action == ActionV2.TRADE_DT
+                    else self.cfg.dc_entry_threshold_rate
+                    if decision.action == ActionV2.TRADE_DC
+                    else max(self.cfg.dt_entry_threshold_rate, self.cfg.dc_entry_threshold_rate)
+                )
+                premium_signal = max(exec_dc, exec_dt)
+                self.validation_recorder.record_trade_intent(TradeIntentRecord(
+                    symbol=self.cfg.symbol,
+                    action=decision.action.value if hasattr(decision.action, "value") else str(decision.action),
+                    signal_premium=float(premium_signal),
+                    exec_premium=float(max(exec_dc, exec_dt)),
+                    entry_threshold=float(threshold_used),
+                    fee_stack=float(
+                        self._directional_fee_stack(decision.action == ActionV2.TRADE_DT)
+                        if decision.action in (ActionV2.TRADE_DT, ActionV2.TRADE_DC)
+                        else self.cfg.fee_rate + self._eff_fee() + 2.0 * self.cfg.slippage_rate
+                    ),
+                    usdt_balance=float(self.usdt),
+                    usdc_balance=float(self.usdc),
+                    notional_planned=float(
+                        (self.usdt + self.usdc) * self.cfg.entry_split_fraction
+                    ) if is_entry else 0.0,
+                    signal_kept=is_entry,
+                    reason_blocked="" if is_entry else "below_threshold_or_hold",
+                    coin_price_usdt=float(mid_ut),
+                    coin_price_usdc=float(mid_uc),
+                ))
+            except Exception as e:
+                log.debug(f"[v131 validation] record_trade_intent failed: {e}")
+
         if decision.action in (ActionV2.TRADE_DT, ActionV2.TRADE_DC):
             # 통합 풀 모드: 다른 코인이 거래 중이면 이번 틱 스킵
             if self.global_lock is not None and not self.global_lock.try_acquire(self.cfg.symbol):
@@ -1197,7 +1367,23 @@ class V12LiveEngineV2:
         stable_name = "USDC" if is_dt else "USDT"
 
         required_stable = self.usdc if is_dt else self.usdt
-        notional = (self.usdt + self.usdc) * self.cfg.entry_split_fraction
+        # ── v1.31 Phase C capital allocator (weight) ────────────────────
+        # Phase A risk_v131 size_multiplier와 독립 — 둘 다 있으면 곱셈 적용.
+        cap_mult = 1.0
+        if self.capital_allocator is not None:
+            try:
+                cap_mult = float(self.capital_allocator.get_multiplier(self.cfg.symbol))
+            except Exception as e:
+                log.debug(f"[capital] get_multiplier failed: {e}")
+                cap_mult = 1.0
+        risk_mult = 1.0
+        if self.risk_v131 is not None:
+            try:
+                risk_mult = float(self.risk_v131.size_multiplier())
+            except Exception:
+                risk_mult = 1.0
+        effective_fraction = self.cfg.entry_split_fraction * cap_mult * risk_mult
+        notional = (self.usdt + self.usdc) * effective_fraction
         # available 잔고를 초과하지 않도록 notional 상한 적용
         # 기존 required_stable < notional * 0.99 체크는 1% 오차를 허용했으나
         # 실제 주문 시 -2010(잔고 부족) 반복 유발 → notional을 잔고로 clamp
@@ -1230,9 +1416,9 @@ class V12LiveEngineV2:
             )
             return
 
-        # 수익성 체크: IOC는 buy_price(상한)가 아닌 raw_ask에 체결되므로 raw_ask 기준으로 계산
-        # Leg A는 IOC(taker), Leg B는 GTC(maker) → fee_stack = fee_rate + fee_maker_rate
-        actual_fee_stack = self.cfg.fee_rate + self._eff_fee() + 2.0 * self.cfg.slippage_rate
+        # 수익성 체크: IOC는 buy_price(상한)가 아닌 raw_ask에 체결되므로 raw_ask 기준
+        # 방향별 USDC promo 반영: DT면 LegA=USDC pair taker(0.07125%), DC면 USDT pair taker(0.075%)
+        actual_fee_stack = self._directional_fee_stack(is_dt)
         actual_premium = (bid_legb - raw_ask) / raw_ask if raw_ask > 0 else 0.0
         if actual_premium < actual_fee_stack:
             log.info(
@@ -1252,6 +1438,7 @@ class V12LiveEngineV2:
         # 디버깅용 상태 저장
         self._leg_a_raw_ask = raw_ask
         self._leg_a_submit_ts = time.time()
+        self._leg_a_submit_ns = time.monotonic_ns()
         if self.dry_run:
             self.leg_a_order_id = "DRY"
             self._leg_a_via_ws = False
@@ -1281,6 +1468,28 @@ class V12LiveEngineV2:
                         log.warning(f"잔고 재동기화 실패: {e_sync}")
                 return
 
+            # IOC 응답 즉시 검사 — EXPIRED + exec_qty=0 이면 그 자리에서 miss 처리.
+            # WS API/REST `order.place` 응답에는 status/executedQty가 이미 들어 있어
+            # UDS 이벤트나 0.5s REST 폴링을 기다리면 ~1초 손해 → ask 사라져 매번 EXPIRED.
+            resp_status   = str(resp.get("status", ""))
+            resp_exec_qty = float(resp.get("executedQty", 0.0) or 0.0)
+            if resp_status in ("EXPIRED", "CANCELED") and resp_exec_qty == 0.0:
+                log.info(
+                    f"[{self._now_str()}] Leg A IOC miss ({resp_status}) 즉시감지 (place 응답) → IDLE 복귀"
+                )
+                self.ioc_miss_count += 1
+                self._period_ioc_miss += 1
+                self._log_ioc_miss(miss_reason=resp_status, detect_method="place응답즉시")
+                self._log_event(
+                    "IOC_MISS", "DT" if is_dt else "DC", premium, 0.0,
+                    self.cfg.dt_entry_threshold_rate if is_dt else self.cfg.dc_entry_threshold_rate,
+                    (time.time() - self._leg_a_submit_ts) * 1000, resp_status,
+                )
+                self._log_latency(resp_status, self._leg_a_via_ws)
+                self._last_leg_a_attempt_ts = time.time() + self.cfg.ioc_miss_cooldown_sec
+                self._reset()
+                return
+
         self.current_action = action
         self.leg_a_notional = notional
         self.leg_a_btc_qty = btc_qty
@@ -1294,6 +1503,10 @@ class V12LiveEngineV2:
 
     def _start_speculative(self, mid_ut: float, mid_uc: float, action: ActionV2) -> None:
         """Leg A IOC + Leg B GTC 동시 제출. Leg A miss 시 Leg B 즉시 취소."""
+        # TODO(v1.32, bug_021): cap_mult/risk_mult 적용 누락 — 현재 use_speculative_leg_b
+        # 가 모든 코인에서 false라 dormant. speculative 모드 재활성 시 capital_allocator/
+        # risk_v131.size_multiplier 가 silently bypass 되므로 _start_leg_a와 동일한
+        # effective_fraction = entry_split_fraction × cap_mult × risk_mult 로 통일할 것.
         is_dt = action == ActionV2.TRADE_DT
         sym_a = self.cfg.binance_symbol_usdc if is_dt else self.cfg.binance_symbol_usdt
         sym_b = self.cfg.binance_symbol_usdt if is_dt else self.cfg.binance_symbol_usdc
@@ -1329,6 +1542,7 @@ class V12LiveEngineV2:
         # 디버깅용 상태 저장
         self._leg_a_raw_ask = raw_ask
         self._leg_a_submit_ts = time.time()
+        self._leg_a_submit_ns = time.monotonic_ns()
 
         if self.dry_run:
             self.leg_a_order_id = "DRY_A"
@@ -1415,6 +1629,7 @@ class V12LiveEngineV2:
             self._log_event("TIMEOUT_A", "DT" if is_dt else "DC", self.entry_premium, 0.0,
                             self.cfg.dt_entry_threshold_rate if is_dt else self.cfg.dc_entry_threshold_rate,
                             elapsed * 1000, "Leg A 타임아웃")
+            self._log_latency("TIMEOUT", self._leg_a_via_ws)
             self._last_leg_a_attempt_ts = time.time() + self.cfg.ioc_miss_cooldown_sec
             self._reset()
             return
@@ -1452,6 +1667,7 @@ class V12LiveEngineV2:
                             self._log_event("IOC_MISS", "DT" if is_dt else "DC", self.entry_premium, 0.0,
                                             self.cfg.dt_entry_threshold_rate if is_dt else self.cfg.dc_entry_threshold_rate,
                                             (time.time() - self._leg_a_submit_ts) * 1000, status_x)
+                            self._log_latency(status_x, self._leg_a_via_ws)
                             self._last_leg_a_attempt_ts = time.time() + self.cfg.ioc_miss_cooldown_sec
                             self._reset()
                             return
@@ -1491,6 +1707,7 @@ class V12LiveEngineV2:
                             self.cfg.dt_entry_threshold_rate if is_dt else self.cfg.dc_entry_threshold_rate,
                             (time.time() - self._leg_a_submit_ts) * 1000, order_status_str,
                         )
+                        self._log_latency(order_status_str, self._leg_a_via_ws)
                         self._last_leg_a_attempt_ts = time.time() + self.cfg.ioc_miss_cooldown_sec
                         self._reset()
                         return
@@ -1517,6 +1734,7 @@ class V12LiveEngineV2:
                     )
                     self.leg_a_price = actual_avg_price
             log.info(f"[{self._now_str()}] Leg A 체결: {exec_qty:.8f} {self.cfg.symbol}  notional={self.leg_a_notional:.4f}")
+            self._log_latency("FILLED", self._leg_a_via_ws)
             if is_dt:
                 self.usdc = max(self.usdc - self.leg_a_notional, 0.0)
             else:
@@ -1881,7 +2099,7 @@ class V12LiveEngineV2:
             if self.trade_count % 20 == 0:
                 equity = self.usdt + self.usdc
                 self._notify(
-                    f"📊 <b>v1.28 중간 현황 [{self.cfg.symbol}]</b> (거래 {self.trade_count}회 달성)\n"
+                    f"📊 <b>v1.3 중간 현황 [{self.cfg.symbol}]</b> (거래 {self.trade_count}회 달성)\n"
                     f"━━━━━━━━━━━━━━━━━━━━\n"
                     f"💰 누적 순수익: {self._usd_krw(self.total_pnl_usd)}  <i>(BNB 수수료 포함)</i>\n"
                     f"💼 잔고\n"
@@ -2247,6 +2465,61 @@ class V12LiveEngineV2:
             elapsed_sec=elapsed_sec,
             note=note,
         )
+        # ── v1.31 risk hook (try/except로 엔진 흐름과 격리) ──────────────
+        if self.risk_v131 is not None:
+            try:
+                self.risk_v131.record_trade_close(
+                    pnl_usd=float(pnl),
+                    note=note,
+                    extra={
+                        "action": self.current_action.value,
+                        "received_usd": float(received),
+                        "elapsed_sec": float(elapsed_sec),
+                        "entry_premium": float(self.entry_premium),
+                        "signal_premium": float(self.signal_premium),
+                        "leg_a_price": float(self.leg_a_price),
+                        "leg_b_price": float(self.leg_b_price),
+                        "qty": float(self.leg_a_btc_qty),
+                    },
+                )
+            except Exception as e:
+                log.warning(f"[v131 risk] record_trade_close failed: {e}")
+
+        # ── v1.31 validation artifact hook (bundle: checkpoint + risk_check) ──
+        if self.validation_recorder is not None:
+            try:
+                note_upper = (note or "").upper()
+                is_stop = "STOP_LOSS" in note_upper
+                is_abort = "ABORT" in note_upper or "EMERGENCY" in note_upper
+                trigger_name = (
+                    note if note else "leg_b_filled"
+                )
+                # TODO(v1.32, bug_009): from_state 동적화 — ABORT_LEG_B_PREMIUM_GONE /
+                # ABORT_LEG_B_ORDER_FAILED 두 경로는 LEG_A_PENDING에서 _finalize_trade를
+                # 호출하므로 "LEG_B_PENDING" 라벨이 부정확. validation_artifacts 모듈이
+                # 본격 활성될 때(현재 모듈 미존재) self.state.name을 캡처해 전달하도록
+                # 변경할 것. 현 시점은 게이트 OFF + 모듈 부재로 audit 영향 없음.
+                self.validation_recorder.record_trade_close_bundle(
+                    symbol=self.cfg.symbol,
+                    from_state="LEG_B_PENDING",   # close는 대부분 LEG_B에서 전이
+                    to_state="IDLE",
+                    trigger=trigger_name,
+                    pnl_usd=float(pnl),
+                    notional_usd=float(self.leg_a_notional),
+                    elapsed_sec=float(elapsed_sec),
+                    entry_premium=float(self.entry_premium),
+                    exec_premium=float(self.signal_premium),
+                    stop_loss_triggered=is_stop,
+                    abort_triggered=is_abort,
+                    extra={
+                        "action": self.current_action.value,
+                        "received_usd": float(received),
+                        "leg_a_price": float(self.leg_a_price),
+                        "leg_b_price": float(self.leg_b_price),
+                    },
+                )
+            except Exception as e:
+                log.warning(f"[v131 validation] record_trade_close_bundle failed: {e}")
 
     def _reset(self) -> None:
         self.state = TradeState.IDLE
@@ -2263,6 +2536,10 @@ class V12LiveEngineV2:
         self._spec_leg_b_filled = False
         self._spec_received = 0.0
         self._spec_leg_b_repriced = False
+        # latency 측정 ns 필드 (다음 trade가 stale 값 상속하지 않도록 0 → -1.0 sentinel 복원)
+        self._last_wake_trigger_ns = 0
+        self._leg_a_decide_ns = 0
+        self._leg_a_submit_ns = 0
         # 통합 풀 모드: 거래 완료/취소 시 글로벌 락 해제
         if self.global_lock is not None:
             self.global_lock.release(self.cfg.symbol)

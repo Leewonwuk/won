@@ -16,29 +16,31 @@ binance_symbol_usdc: XRPUSDC
 initial_usdt: 1199.0
 initial_usdc: 1199.0
 
-# 진입 임계값
-# fee_stack = taker 0.075% + maker 0.075% = 0.150%
-# IOC 실제 오버페이 ≈ 1~2틱 = 0.005~0.010% (버퍼 최악 0.020%)
-# 실질 손익분기 ≈ 0.155~0.160% → 0.175%는 평균 0.015~0.020% 마진
-dt_entry_threshold_rate: 0.0017
-dc_entry_threshold_rate: 0.0017
+# 진입 임계값 — 방향별 fee_stack 분리
+# DT: LegA=USDC pair taker (USDC promo 0.07125%) + LegB=USDT pair maker 0.075% = 0.14625%
+# DC: LegA=USDT pair taker 0.075% + LegB=USDC pair maker 0.075% = 0.150%
+dt_entry_threshold_rate: 0.001663   # 0.14625% + 0.0175% margin
+dc_entry_threshold_rate: 0.0017     # 0.150% + 0.020% margin
 
-entry_split_fraction: 0.25   # (644+644) × 0.25 = 322 USDT/trade
+entry_split_fraction: 0.25
 
-# 수수료 — BNB 25% 할인 기준
-fee_rate: 0.00075            # BNB 25% 할인 taker (0.1% × 0.75)
-fee_maker_rate: 0.00075      # BNB 25% 할인 maker (0.1% × 0.75)
+# 수수료 — Binance VIP0 + BNB 25% 할인 + USDC promo (Taker만)
+fee_rate: 0.00075            # USDT pair Taker (0.1% × 0.75)
+fee_maker_rate: 0.00075      # USDT pair Maker (0.1% × 0.75)
+fee_usdc_pair_taker: 0.0007125   # USDC pair Taker, promo (0.095% × 0.75)
+fee_usdc_pair_maker: 0.00075     # USDC pair Maker, promo 없음 (0.1% × 0.75)
 use_maker_fees: true
 
 slippage_rate: 0.0
 
-# IOC Leg A 버퍼: XRP tick=$0.0001 (≈0.005%/틱), 0.0002 ≈ 2틱 여유
-ioc_price_buffer_rate: 0.0002
+# IOC Leg A 버퍼: XRP tick=$0.0001 (≈0.007%/틱), 0.0003 ≈ 3틱 여유
+# (2026-04-17: 0.0002→0.0003 상향, 2틱 버퍼로는 피크 구간 EXPIRED 다발)
+ioc_price_buffer_rate: 0.0003
 
 # Leg B
 use_speculative_leg_b: false
 leg_b_abort_threshold_rate: -0.99
-leg_b_stop_loss_rate: 0.003
+leg_b_stop_loss_rate: 0.0025
 leg_b_reprice_on_drop: true
 
 # 비상 청산
